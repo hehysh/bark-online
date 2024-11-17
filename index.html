@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bark 推送助手</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* 全局设置 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f7;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* 文档标志 */
+        #docLink {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            text-decoration: none;
+            color: #333;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        #docLink:hover {
+            color: #333;
+        }
+
+        /* 容器样式 */
+        #setup, #main {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* 标题样式 */
+        h1 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* 表单元素样式 */
+        input, textarea, button {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        input:focus, textarea:focus {
+            border-color: #333;
+        }
+
+        /* 按钮样式 */
+        button {
+            margin-top: 20px;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #333;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #000000;
+        }
+
+        /* 清除密钥按钮样式 */
+        #clearButton {
+            background-color: #e11d48;
+        }
+
+        #clearButton:hover {
+            background-color: #b91c1c;
+        }
+
+        /* 弹窗样式 */
+        #paramsModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+            z-index: 1000;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        #modalOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 隐藏元素 */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 文档标志 -->
+    <a id="docLink" href="https://bark.day.app/#/tutorial" target="_blank" style="position: absolute; top: 10px; left: 10px; text-decoration: none;">
+       <i class="fa fa-book" style="font-size: 24px; color: #333;"></i>
+    </a>
+
+
+    <!-- 密钥设置界面 -->
+    <div id="setup" class="hidden">
+        <h1>设置设备密钥</h1>
+        <input type="text" id="deviceKeySetup" placeholder="请输入设备密钥">
+        <button onclick="saveDeviceKey()">保存密钥</button>
+    </div>
+
+    <!-- 主操作界面 -->
+    <div id="main" class="hidden">
+        <h1>Bark 推送助手</h1>
+        <form id="barkForm">
+            <input type="text" id="title" placeholder="请输入通知标题 (Title)" required>
+            <textarea id="body" rows="4" placeholder="请输入通知内容 (Body)" required></textarea>
+            <button type="button" onclick="showParamsModal()">填写参数</button>
+            <button type="button" onclick="sendNotification()">发送通知</button>
+        </form>
+        <button id="clearButton" onclick="clearDeviceKey()">清除密钥</button>
+    </div>
+
+    <!-- 参数弹窗 -->
+    <div id="modalOverlay" onclick="hideParamsModal()"></div>
+    <div id="paramsModal">
+        <h2>填写参数</h2>
+        <input type="text" id="group" placeholder="分组 (group)">
+        <input type="number" id="badge" placeholder="徽章数量 (badge)">
+        <input type="text" id="sound" placeholder="声音 (sound)">
+        <button onclick="saveParams()">保存参数</button>
+    </div>
+
+    <script>
+        // 页面加载时检查密钥
+        window.onload = function () {
+            const deviceKey = localStorage.getItem("deviceKey");
+            if (deviceKey) {
+                document.getElementById("main").classList.remove("hidden");
+            } else {
+                document.getElementById("setup").classList.remove("hidden");
+            }
+        };
+
+        // 保存设备密钥
+        function saveDeviceKey() {
+            const deviceKey = document.getElementById("deviceKeySetup").value.trim();
+            if (!deviceKey) {
+                alert("设备密钥不能为空！");
+                return;
+            }
+            localStorage.setItem("deviceKey", deviceKey);
+            alert("设备密钥已保存！");
+            document.getElementById("setup").classList.add("hidden");
+            document.getElementById("main").classList.remove("hidden");
+        }
+
+        // 参数管理
+        function showParamsModal() {
+            document.getElementById("modalOverlay").style.display = "block";
+            document.getElementById("paramsModal").style.display = "block";
+        }
+
+        function hideParamsModal() {
+            document.getElementById("modalOverlay").style.display = "none";
+            document.getElementById("paramsModal").style.display = "none";
+        }
+
+        function saveParams() {
+            const group = document.getElementById("group").value.trim();
+            const badge = document.getElementById("badge").value.trim();
+            const sound = document.getElementById("sound").value.trim();
+            const params = [];
+            if (group) params.push(`group=${group}`);
+            if (badge) params.push(`badge=${badge}`);
+            if (sound) params.push(`sound=${sound}`);
+            localStorage.setItem("params", params.join("&"));
+            alert("参数已保存！");
+            hideParamsModal();
+        }
+
+        // 发送通知
+        async function sendNotification() {
+            const deviceKey = localStorage.getItem("deviceKey");
+            if (!deviceKey) {
+                alert("未设置设备密钥，请刷新页面并重新设置！");
+                return;
+            }
+
+            const title = encodeURIComponent(document.getElementById("title").value.trim());
+            const body = encodeURIComponent(document.getElementById("body").value.trim());
+            const params = localStorage.getItem("params") || "";
+
+            if (!title || !body) {
+                alert("请填写通知标题和内容！");
+                return;
+            }
+
+            const url = `https://api.day.app/${deviceKey}/${title}/${body}${params ? "?" + params : ""}`;
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    alert("通知发送成功！");
+                } else {
+                    alert("通知发送失败，请检查参数！");
+                }
+            } catch (error) {
+                console.error("发送失败:", error);
+                alert("发生错误，请稍后重试！");
+            }
+        }
+
+        // 清除设备密钥
+        function clearDeviceKey() {
+            if (confirm("确定要清除设备密钥吗？")) {
+                localStorage.removeItem("deviceKey");
+                localStorage.removeItem("params");
+                alert("设备密钥已清除，请刷新页面重新设置！");
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
