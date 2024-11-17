@@ -75,12 +75,12 @@
             background-color: #555;
         }
 
-        /* 清除密钥按钮 */
-        .clear-btn {
+        /* 清除密钥按钮和更改服务器按钮 */
+        .secondary-btn {
             background-color: #e11d48;
         }
 
-        .clear-btn:hover {
+        .secondary-btn:hover {
             background-color: #b91c1c;
         }
 
@@ -89,7 +89,7 @@
             display: none;
         }
 
-        #paramsPopup {
+        #paramsPopup, #serverPopup {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -101,7 +101,7 @@
             z-index: 1000;
         }
 
-        #paramsPopup h3 {
+        #paramsPopup h3, #serverPopup h3 {
             margin-top: 0;
         }
 
@@ -141,6 +141,8 @@
         <h1>设置设备密钥</h1>
         <label for="deviceKeySetup">请输入您的设备密钥 (Device Key):</label>
         <input type="text" id="deviceKeySetup" placeholder="请输入设备密钥">
+        <label for="serverSetup">请输入Bark服务器 (默认为api.day.app):</label>
+        <input type="text" id="serverSetup" placeholder="例如：api.day.app">
         <button onclick="saveDeviceKey()">保存密钥</button>
     </div>
 
@@ -159,7 +161,8 @@
             <button type="button" onclick="sendNotification()">发送通知</button>
         </form>
 
-        <button class="clear-btn" onclick="clearDeviceKey()">清除密钥</button>
+        <button class="secondary-btn" onclick="clearDeviceKey()">清除密钥</button>
+        <button class="secondary-btn" onclick="toggleServerPopup()">更改服务器</button>
     </div>
 
     <!-- 可选参数弹窗 -->
@@ -186,26 +189,42 @@
         </div>
     </div>
 
+    <!-- 更改服务器弹窗 -->
+    <div id="serverPopup" class="hidden">
+        <h3>更改服务器</h3>
+        <label for="newServer">请输入新的服务器地址:</label>
+        <input type="text" id="newServer" placeholder="例如：api.day.app">
+        <div style="text-align: right; margin-top: 10px;">
+            <button type="button" onclick="saveServer()">保存</button>
+            <button type="button" onclick="toggleServerPopup()">取消</button>
+        </div>
+    </div>
+
     <script>
-        // 页面加载时检查密钥
+        // 页面加载时检查密钥和服务器
         window.onload = function () {
             const deviceKey = localStorage.getItem("deviceKey");
-            if (deviceKey) {
-                document.getElementById("main").classList.remove("hidden");
-            } else {
+            const server = localStorage.getItem("server") || "api.day.app";
+
+            if (!deviceKey) {
                 document.getElementById("setup").classList.remove("hidden");
+                document.getElementById("serverSetup").value = server;
+            } else {
+                document.getElementById("main").classList.remove("hidden");
             }
         };
 
         // 保存密钥
         function saveDeviceKey() {
             const deviceKey = document.getElementById("deviceKeySetup").value.trim();
+            const server = document.getElementById("serverSetup").value.trim() || "api.day.app";
             if (!deviceKey) {
                 alert("设备密钥不能为空！");
                 return;
             }
             localStorage.setItem("deviceKey", deviceKey);
-            alert("设备密钥已保存！");
+            localStorage.setItem("server", server);
+            alert("设备密钥和服务器地址已保存！");
             document.getElementById("setup").classList.add("hidden");
             document.getElementById("main").classList.remove("hidden");
         }
@@ -230,50 +249,72 @@
             toggleParamsPopup();
         }
 
-        // 发送通知
-        async function sendNotification() {
-            const deviceKey = localStorage.getItem("deviceKey");
-            if (!deviceKey) {
-                alert("未设置设备密钥，请刷新页面并重新设置！");
+        // 切换服务器弹窗
+        function toggleServerPopup() {
+            const popup = document.getElementById("serverPopup");
+            popup.classList.toggle("hidden");
+            const server = localStorage.getItem("server") || "api.day.app";
+            document.getElementById("newServer").value = server;
+        }
+
+        // 保存服务器地址
+        function saveServer() {
+            const server = document.getElementById("newServer").value.trim();
+            if (!server) {
+                alert("服务器地址不能为空！");
                 return;
             }
-
-            const title = encodeURIComponent(document.getElementById("title").value.trim());
-            const body = encodeURIComponent(document.getElementById("body").value.trim());
-            const params = JSON.parse(localStorage.getItem("barkParams")) || {};
-            let paramString = "";
-
-            Object.keys(params).forEach(key => {
-                if (params[key]) {
-                    paramString += `&${key}=${encodeURIComponent(params[key])}`;
-                }
-            });
-
-            if (!title || !body) {
-                alert("请填写通知标题和内容！");
-                return;
-            }
-
-            const url = `https://api.day.app/${deviceKey}/${title}/${body}?${paramString}`;
-            try {
-                const response = await fetch(url);
-                if (response.ok) {
-                    alert("通知发送成功！");
-                } else {
-                    alert("通知发送失败，请检查参数！");
-                }
-            } catch (error) {
-                console.error("发送失败:", error);
-                alert("发生错误，请稍后重试！");
-            }
+            localStorage.setItem("server", server);
+            alert("服务器地址已保存！");
+            toggleServerPopup();
         }
 
         // 清除密钥
         function clearDeviceKey() {
-            if (confirm("确定要清除设备密钥吗？")) {
+            if (confirm("确定清除设备密钥吗？")) {
                 localStorage.removeItem("deviceKey");
                 location.reload();
             }
+        }
+
+        // 发送通知
+        function sendNotification() {
+            const deviceKey = localStorage.getItem("deviceKey");
+            const server = localStorage.getItem("server") || "api.day.app";
+
+            if (!deviceKey) {
+                alert("设备密钥未设置！");
+                return;
+            }
+
+            const title = document.getElementById("title").value.trim();
+            const body = document.getElementById("body").value.trim();
+
+            if (!title || !body) {
+                alert("标题和内容不能为空！");
+                return;
+            }
+
+            const params = JSON.parse(localStorage.getItem("barkParams") || "{}");
+            const url = new URL(`https://${server}/${deviceKey}`);
+            url.searchParams.append("title", title);
+            url.searchParams.append("body", body);
+
+            for (const [key, value] of Object.entries(params)) {
+                if (value) {
+                    url.searchParams.append(key, value);
+                }
+            }
+
+            fetch(url.toString())
+                .then(response => {
+                    if (response.ok) {
+                        alert("通知发送成功！");
+                    } else {
+                        alert("通知发送失败！");
+                    }
+                })
+                .catch(() => alert("通知发送失败！"));
         }
     </script>
 </body>
